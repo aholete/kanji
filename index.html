@@ -1,265 +1,104 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ARマーカー作成アプリ — 修正版</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARマーカー作成アプリ</title>
   <style>
-    body{font-family:system-ui,-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;margin:20px;max-width:980px}
-    h1{font-size:1.2rem;margin-bottom:8px}
-    .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .preview{border:1px dashed #ccc;padding:10px;background:#fafafa}
-    img#previewImg{max-width:300px;max-height:300px;display:block}
-    .buttons{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-    button,input[type=file]{padding:8px 10px;font-size:14px}
-    .note{color:#555;font-size:0.95rem;margin-top:10px}
-    .result{margin-top:12px}
-    .ok{color:#197}
-    .warn{color:#b33}
-    iframe.previewFrame{width:360px;height:360px;border:1px solid #ddd}
+    body {
+      font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+      margin: 0;
+      padding: 2em;
+      background: #f5f5f5;
+      color: #333;
+      text-align: center;
+    }
+    h1 { margin-bottom: 1em; }
+    input[type="file"] {
+      margin-bottom: 1em;
+    }
+    button {
+      margin: 0.5em;
+      padding: 0.6em 1.2em;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    iframe {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #ccc;
+      margin-top: 1em;
+      background: white;
+    }
   </style>
 </head>
 <body>
-  <h1>ARマーカー作成アプリ — 修正版</h1>
-  <p>アップロード画像を Hiro マーカー上に表示する HTML を生成します。<br>
-     <strong>サンドボックスプレビュー</strong>（安全、iframe表示）と<strong>AR実機モード</strong>（A-Frame + AR.js、実機での確認推奨）があります。</p>
+  <h1>ARマーカー作成アプリ</h1>
+  <p>画像をアップロードして、その画像を表示するARマーカーを作成できます。</p>
 
-  <div class="controls">
-    <div>
-      <label for="imageInput">画像を選択 (PNG/JPEG)</label><br>
-      <input id="imageInput" type="file" accept="image/*">
-    </div>
+  <input type="file" id="imageInput" accept="image/*"><br>
+  <button id="generateBtn">生成</button>
+  <button id="sampleBtn">サンプル画像でテスト</button>
 
-    <div class="preview" id="previewBox" aria-hidden="false">
-      <div><strong>プレビュー</strong></div>
-      <img id="previewImg" alt="preview" src="" style="display:none">
-      <div id="noPreview">画像が選択されていません</div>
-    </div>
-  </div>
+  <iframe id="previewFrame" title="ARプレビュー"></iframe>
 
-  <div style="margin-top:8px">
-    <label><input type="radio" name="mode" value="sandbox" checked> サンドボックスプレビュー（安全）</label>
-    <label style="margin-left:12px"><input type="radio" name="mode" value="ar"> AR実機モード（実機で確認）</label>
-  </div>
+  <script>
+    const generateBtn = document.getElementById('generateBtn');
+    const sampleBtn = document.getElementById('sampleBtn');
+    const imageInput = document.getElementById('imageInput');
+    const previewFrame = document.getElementById('previewFrame');
 
-  <div class="buttons">
-    <button id="generateBtn" disabled>生成</button>
-    <button id="openBtn" disabled>新しいタブで開く</button>
-    <button id="downloadBtn" disabled>ダウンロード</button>
-    <button id="sampleBtn">サンプル画像でテスト</button>
-    <button id="hiroBtn">Hiro マーカーを開く（印刷用）</button>
-  </div>
-
-  <div class="note">
-    <strong>注意:</strong> AR実機モードは HTTPS とカメラ許可が必要（スマホでの実機確認を推奨）。サンドボックスは静的プレビューです。
-  </div>
-
-  <div class="result" id="result"></div>
-
-<script>
-/* === 安全性のポイント ===
- - 親スクリプトが途中で閉じられないよう、生成HTMLの組み立てで `</script>` を直接ソース内に置かない工夫をしています。
- - サンドボックスは iframe に base64 data URL を読み込ませて表示します（親ページの document.write を使わない）。
- - 実機用は Blob を作ってダウンロードする方式です。
-*/
-
-const imageInput = document.getElementById('imageInput');
-const previewImg = document.getElementById('previewImg');
-const noPreview = document.getElementById('noPreview');
-const generateBtn = document.getElementById('generateBtn');
-const openBtn = document.getElementById('openBtn');
-const downloadBtn = document.getElementById('downloadBtn');
-const sampleBtn = document.getElementById('sampleBtn');
-const hiroBtn = document.getElementById('hiroBtn');
-const resultDiv = document.getElementById('result');
-
-let uploadedDataUrl = '';
-let lastBlobUrl = '';
-let lastHtmlString = '';
-let lastFilename = 'ar_marker_preview.html';
-
-function fileToDataUrl(file){
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result);
-    fr.onerror = () => reject(new Error('FileReader error'));
-    fr.readAsDataURL(file);
-  });
-}
-
-imageInput.addEventListener('change', async (e) => {
-  const f = e.target.files && e.target.files[0];
-  if(!f) return;
-  if(!f.type.startsWith('image/')) return alert('画像ファイルを選択してください');
-  try {
-    const data = await fileToDataUrl(f);
-    uploadedDataUrl = data;
-    previewImg.src = data;
-    previewImg.style.display = 'block';
-    noPreview.style.display = 'none';
-    generateBtn.disabled = false;
-    clearResult();
-  } catch(err) {
-    console.error('file load error', err);
-    alert('画像の読み込みに失敗しました');
-  }
-});
-
-sampleBtn.addEventListener('click', () => {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='100%' height='100%' fill='#fff'/><circle cx='256' cy='200' r='120' fill='#eee'/><text x='50%' y='85%' text-anchor='middle' font-size='36' fill='#333'>Sample</text></svg>`;
-  const data = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-  uploadedDataUrl = data;
-  previewImg.src = data;
-  previewImg.style.display = 'block';
-  noPreview.style.display = 'none';
-  generateBtn.disabled = false;
-  clearResult();
-});
-
-hiroBtn.addEventListener('click', () => {
-  window.open('https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/images/HIRO.jpg', '_blank');
-});
-
-function getMode(){
-  const r = document.querySelector('input[name="mode"]:checked');
-  return r ? r.value : 'sandbox';
-}
-
-function clearResult(){
-  resultDiv.innerHTML = '';
-  if(lastBlobUrl){
-    try{ URL.revokeObjectURL(lastBlobUrl); }catch(e){}
-    lastBlobUrl = '';
-  }
-  openBtn.disabled = true;
-  downloadBtn.disabled = true;
-  lastHtmlString = '';
-}
-
-function toBase64Unicode(str){
-  // unicode-safe base64
-  return btoa(unescape(encodeURIComponent(str)));
-}
-
-function createBlobUrl(html){
-  const blob = new Blob([html], { type: 'text/html' });
-  return URL.createObjectURL(blob);
-}
-
-// safe script tag builder (avoid literal closing sequence in parent file)
-function safeScriptTag(src){
-  return '<' + 'script src="' + src + '">' + '<' + '/scr' + 'ipt>';
-}
-
-/* ---------- Generators ---------- */
-
-function buildSandboxHtml(imageDataUrl){
-  // static preview: Hiro-like SVG + overlay image
-  const svgMarker = '<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="100%" height="100%" fill="#fff"/><rect x="48" y="48" width="416" height="416" fill="#000"/><rect x="96" y="96" width="320" height="320" fill="#fff"/><rect x="128" y="128" width="256" height="256" fill="#000"/><text x="50%" y="96%" text-anchor="middle" fill="#333" font-size="18">Hiro-like Marker (preview)</text></svg>';
-  const style = 'body{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fafafa}.frame{position:relative;width:360px;height:360px;border:1px solid #ddd;background:#fff;padding:12px;box-shadow:0 6px 24px rgba(0,0,0,0.08)}.marker{width:100%;height:100%;display:block}.overlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60%;height:60%;object-fit:contain;border:2px solid rgba(255,255,255,0.7)}';
-  const html = '<!doctype html>\\n<html lang=\"ja\">\\n<head>\\n<meta charset=\"utf-8\">\\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\\n<title>Sandbox Preview</title>\\n<style>' + style + '</style>\\n</head>\\n<body>\\n<div class=\"frame\">\\n  <img class=\"marker\" src=\"data:image/svg+xml;utf8,' + encodeURIComponent(svgMarker) + '\" alt=\"marker\">\\n  <img class=\"overlay\" src=\"' + imageDataUrl + '\" alt=\"uploaded\">\\n</div>\\n</body>\\n</html>';
-  return html;
-}
-
-function buildArHtml(imageDataUrl){
-  // AR実機モード — includes A-Frame + AR.js script tags (note: scripts only run on actual browsers, not sandbox)
-  const style = 'body{margin:0;font-family:system-ui} .hint{position:fixed;left:8px;top:8px;z-index:999;background:rgba(255,255,255,0.95);padding:8px;border-radius:6px}';
-  const head = '<!doctype html>\\n<html lang=\"ja\">\\n<head>\\n<meta charset=\"utf-8\">\\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\\n<title>AR Preview</title>\\n<meta http-equiv=\"Content-Security-Policy\" content=\"default-src \\'self\\' data: https:; script-src \\'self\\' https:; style-src \\'self\\' \\'unsafe-inline\\' https:; img-src \\'self\\' data: https:;\">\\n<style>' + style + '</style>\\n';
-  const scripts = safeScriptTag('https://aframe.io/releases/1.4.2/aframe.min.js') + '\\n' + safeScriptTag('https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js');
-  const body = '</head>\\n<body>\\n<div class=\"hint\">カメラを許可して Hiro マーカーをかざしてください（実機で開いてください）</div>\\n';
-  const scene = '<a-scene embedded arjs=\"sourceType: webcam; debugUIEnabled: false;\">\\n  <a-marker preset=\"hiro\">\\n    <a-plane src=\"' + imageDataUrl + '\" position=\"0 0 0\" rotation=\"-90 0 0\" width=\"1\" height=\"0.75\"></a-plane>\\n  </a-marker>\\n  <a-entity camera></a-entity>\\n</a-scene>\\n';
-  return head + scripts + body + scene + '\\n</body>\\n</html>';
-}
-
-/* ---------- Actions ---------- */
-
-generateBtn.addEventListener('click', () => {
-  if(!uploadedDataUrl) return alert('先に画像を選択してください');
-  clearResult();
-  const mode = getMode();
-  if(mode === 'sandbox'){
-    const html = buildSandboxHtml(uploadedDataUrl);
-    lastHtmlString = html;
-    const b64 = toBase64Unicode(html);
-    const dataUrl = 'data:text/html;base64,' + b64;
-    // iframe preview
-    const iframe = document.createElement('iframe');
-    iframe.className = 'previewFrame';
-    iframe.src = dataUrl;
-    iframe.sandbox = 'allow-same-origin allow-scripts allow-forms';
-    resultDiv.appendChild(iframe);
-    // create blob link for download/open if possible
-    try {
-      lastBlobUrl = createBlobUrl(html);
-      resultDiv.insertAdjacentHTML('beforeend','<div class="ok">生成完了（サンドボックスプレビュー）。下のリンクから生成HTMLを開いたり保存できます。</div>');
-      resultDiv.insertAdjacentHTML('beforeend','<div style="margin-top:8px"><a href="'+ lastBlobUrl +'" target="_blank" rel="noopener noreferrer">生成したHTMLを新しいタブで開く（Blob）</a></div>');
-      openBtn.disabled = false;
-      downloadBtn.disabled = false;
-    } catch(e) {
-      console.warn('Blob create failed', e);
-      resultDiv.insertAdjacentHTML('beforeend','<div class="warn">注意: Blob の作成に失敗しました（環境による）。iframe でのプレビューを確認してください。</div>');
+    // 生成関数
+    function generateAR(htmlImageSrc) {
+      const html = `
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+          <meta charset="UTF-8">
+          <title>AR表示</title>
+          <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+          <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+          <style>body { margin: 0; overflow: hidden; }</style>
+        </head>
+        <body>
+          <a-scene embedded arjs="sourceType: webcam;">
+            <a-marker preset="hiro">
+              <a-image src="${htmlImageSrc}" rotation="-90 0 0" width="1" height="1"></a-image>
+            </a-marker>
+            <a-entity camera></a-entity>
+          </a-scene>
+        </body>
+        </html>
+      `;
+      // iframeに安全に埋め込む
+      const blob = new Blob([html], { type: 'text/html' });
+      previewFrame.src = URL.createObjectURL(blob);
     }
-  } else {
-    const html = buildArHtml(uploadedDataUrl);
-    lastHtmlString = html;
-    try {
-      lastBlobUrl = createBlobUrl(html);
-      resultDiv.innerHTML = '<div class="ok">生成完了（AR実機モード） — ダウンロードして実機で開いてください</div><div style="margin-top:8px"><a href="'+ lastBlobUrl +'" target="_blank" rel="noopener noreferrer">生成したHTMLを新しいタブで開く（Blob）</a></div>';
-      openBtn.disabled = false;
-      downloadBtn.disabled = false;
-    } catch(e) {
-      console.error('blob error', e);
-      alert('生成に失敗しました（Blob 作成エラー）。ブラウザの環境を確認してください。');
-    }
-  }
-});
 
-openBtn.addEventListener('click', () => {
-  if(lastBlobUrl) {
-    window.open(lastBlobUrl, '_blank');
-  } else if(lastHtmlString) {
-    try {
-      const tmp = createBlobUrl(lastHtmlString);
-      window.open(tmp, '_blank');
-    } catch(e) {
-      alert('新しいタブで開けませんでした: ' + e.message);
-    }
-  } else {
-    alert('先に生成してください');
-  }
-});
+    // 画像アップロード処理
+    generateBtn.addEventListener('click', () => {
+      const file = imageInput.files[0];
+      if (!file) {
+        alert('画像ファイルを選択してください。');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => generateAR(e.target.result);
+      reader.readAsDataURL(file);
+    });
 
-downloadBtn.addEventListener('click', () => {
-  if(lastBlobUrl){
-    const a = document.createElement('a');
-    a.href = lastBlobUrl;
-    a.download = lastFilename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } else if(lastHtmlString){
-    try {
-      const tmp = createBlobUrl(lastHtmlString);
-      const a = document.createElement('a');
-      a.href = tmp;
-      a.download = lastFilename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch(e) {
-      alert('ダウンロードに失敗しました: ' + e.message);
-    }
-  } else {
-    alert('先に生成してください');
-  }
-});
-
-window.addEventListener('unload', () => {
-  if(lastBlobUrl){
-    try{ URL.revokeObjectURL(lastBlobUrl); }catch(e){}
-  }
-});
-</script>
+    // サンプル画像テスト
+    sampleBtn.addEventListener('click', () => {
+      const sampleURL = "https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/images/HIRO.jpg";
+      generateAR(sampleURL);
+    });
+  </script>
 </body>
 </html>
+
 
