@@ -1,142 +1,261 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>漢字メッセージ</title>
-<style>
-  body {
-    font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    margin: 0;
-    background: #fafafa;
-    color: #333;
-  }
-  h1 {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-  }
-  input {
-    font-size: 1.2rem;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    text-align: center;
-    width: 8rem;
-  }
-  button {
-    margin-top: 1rem;
-    padding: 0.5rem 1.2rem;
-    font-size: 1rem;
-    border: none;
-    border-radius: 8px;
-    background-color: #4caf50;
-    color: white;
-    cursor: pointer;
-  }
-  button:hover {
-    background-color: #45a049;
-  }
-  #result {
-    margin-top: 2rem;
-    font-size: 1.2rem;
-    text-align: center;
-    width: 90%;
-    max-width: 500px;
-    line-height: 1.6;
-  }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ARマーカー作成アプリ</title>
+  <meta name="description" content="アップロード画像を Hiro マーカー上に表示する AR マーカー生成アプリ (A-Frame + AR.js)" />
+  <style>
+    :root{--gap:12px}
+    body{font-family:system-ui,-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;margin:24px;max-width:980px}
+    h1{font-size:1.25rem;margin:0 0 8px}
+    .controls{display:flex;gap:var(--gap);flex-wrap:wrap;align-items:center;margin:14px 0}
+    .preview{border:1px dashed #ccc;padding:10px;background:#fafafa}
+    img#previewImg{max-width:300px;max-height:300px;display:block}
+    .buttons{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+    button,input[type=file]{padding:8px 10px;font-size:14px}
+    .note{color:#555;font-size:0.95rem;margin-top:10px}
+    .result{margin-top:12px}
+    footer{margin-top:28px;color:#666;font-size:0.9rem}
+    a.link{display:inline-block;margin-top:6px}
+  </style>
 </head>
 <body>
-  <h1>漢字メッセージ</h1>
-  <input type="text" id="kanjiInput" maxlength="1" placeholder="漢字1文字" />
-  <button id="showBtn">表示</button>
-  <div id="result"></div>
+  <h1>ARマーカー作成アプリ</h1>
+  <p>画像をアップロードして、Hiro マーカーに表示する HTML を生成します。生成したファイルはダウンロードしてスマホで開き、印刷した Hiro マーカーをカメラにかざしてください。</p>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const input = document.getElementById('kanjiInput');
-      const btn = document.getElementById('showBtn');
-      const result = document.getElementById('result');
+  <div class="controls">
+    <div>
+      <label for="imageInput">画像を選択 (PNG/JPEG)</label><br>
+      <input id="imageInput" type="file" accept="image/*">
+    </div>
 
-      const messages = [
-        "静かな時間が心を整える日。","小さな一歩が未来を変える。","今日は笑顔で過ごせそう。","新しい発見が待っている。","心の声に耳を澄ませて。",
-        "過去を見ず、今を感じて。","穏やかな風が幸せを運ぶ。","努力が少しずつ実を結ぶ。","人の優しさに触れられる日。","焦らず、ゆっくり進もう。",
-        "今日は休息が力になる。","挑戦があなたを成長させる。","言葉より行動が伝わる日。","自分を信じる勇気を持とう。","笑うことで運が開ける。",
-        "新しい出会いに恵まれる。","穏やかに流れる時間を大切に。","過ぎたことに囚われないで。","素直な気持ちを大事に。","色男、金と力はなかりけり。",
-        "感謝が幸運を呼び寄せる。","思いやりが心を豊かにする。","一人の時間が心を磨く。","運命の糸が静かに動く。","努力の光が見え始める。",
-        "静けさの中に答えがある。","今日は誰かに優しくできる。","直感を信じて動いてみよう。","心が軽くなる瞬間が来る。","穏やかに過ごせる一日。",
-        "道はゆっくりでも確かに続く。","言葉より想いが届く時。","過去の努力が今を支える。","少しの勇気が世界を変える。","無理せず、自分らしく。",
-        "足の速いものが競争に勝つとは限らない。","目の前の景色に気づこう。","感情を素直に表そう。","信頼が絆を深める日。","歩くことで新しい景色が見える。",
-        "自然の声に耳を傾けよう。","小さな幸せが積み重なる日。","今日は新しいページの始まり。","優しさが巡り巡って戻る。","夢が少し近づく気配。",
-        "心の余裕が明日を呼ぶ。","努力が報われる予感。","今日は穏やかな笑顔で。","人はパンのみに生きるのではない。","新しい視点を得られる日。",
-        "静かに進むことで光が見える。","他人を認める心が広がる。","小さな挑戦が大きな成長に。","感謝が道を照らす。","今を生きる力が湧く日。",
-        "人の言葉が励ましになる。","今日は直感が冴える。","趣味は勉強、特技はテスト。","心に灯りをともす瞬間。","信じる気持ちが現実を動かす。",
-        "笑顔で過ごせば道が開く。","無理せず自然体でいよう。","新しい考えが生まれる時。","誰かのために動く日。","過去の思い出が優しく輝く。",
-        "静寂の中に力が宿る。","宇佐美を独り占め。","今日は焦らず穏やかに。","人の温もりが心を癒す。","新しい風が心を満たす。",
-        "笑うことで不安が消える。","今日は挑戦の第一歩。","言葉が力を持つ日。","願いが少し近づく日。","心の整理をする時間。",
-        "自分らしくあることが美しい。","一歩引くことで見える景色。","努力の芽が育ち始める。","風が背中を押してくれる。","静かな幸せを感じる日。",
-        "今日は原点に戻るチャンス。","過去を受け入れる強さ。","何気ない瞬間に幸せがある。","笑顔が人をつなぐ日。","考えすぎず自然に任せて。",
-        "夢を信じて歩き続けよう。","小さな変化が大きな結果に。","心が安らぐ出来事がある。","今日は誰かに感謝する日。","言葉が心を救う日。",
-        "努力の結果が形になる。","柔らかな光が包み込む日。","新しい流れが始まる。","優しい気持ちを忘れずに。","静かに見守ることも力。",
-        "今日の出来事が未来を作る。","直感が良い方向へ導く。","少しの工夫で変わる日。","過去を糧にして進もう。","自然体で過ごせる一日。",
-        "自分を大切にする時間。","人の笑顔が力になる。","天才は有限、努力は無限。","心の静けさが道を示す。","何事も焦らずに。",
-        "今日は学びの多い日。","新しい発想が生まれる瞬間。","心に余裕を持って過ごそう。","笑顔が周囲を明るくする。","素直な言葉が届く日。",
-        "チャンスは貯蓄できない。","今日の努力が未来を作る。","無理せず休むことも大事。","新しいチャンスが訪れる。","一息つくことで見える景色。",
-        "勉強勉強勉強","優しい言葉が幸せを呼ぶ。","君の瞳にハイキック。","直感が良い方向を示す。","静かに成長していく日。",
-        "出会いが人生を豊かにする。","自分のペースで進めばいい。","変化を恐れず受け入れよう。","今日は未来への準備の日。","少しの勇気が明日を変える。",
-        "空を見上げて深呼吸を。","言葉より行動で示そう。","優しさが巡り巡って戻る。","心のままに進んで大丈夫。","今日は穏やかな喜びに出会う。",
-        "努力を信じて前を向こう。","誰かの笑顔が力になる。","静かな時間に癒やされる日。","柔らかな気持ちで過ごそう。","自分の中にある光を信じて。",
-        "焦らず自然な流れに任せよう。","退かぬ、媚びぬ、省みぬ。","感謝の気持ちを言葉にしよう。","新しい風が背中を押す。","知性と教養が服を着て歩いている。",
-        "無理せずゆっくり進もう。","小さな幸せを感じられる日。","今日は心穏やかに過ごそう。","努力の先に光が見える。","夢に向かって一歩進む日。",
-        "自然の声が導いてくれる。","人とのつながりを感じる日。","気合と根性が服を着て歩いている。","今日は新しい始まり。","思いやりが幸運を呼ぶ日。",
-        "静けさの中に希望がある。","優しさが自分を癒やす日。","今日も自分を信じて進もう。","心が満たされる瞬間がある。","風が未来への道を照らす。",
-        "小さな努力が積み重なる日。","今日は心の休息を。","素直に笑える一日。","変化を受け入れる力が湧く。","人との会話にヒントがある。",
-        "穏やかな気持ちで進もう。","静かな光があなたを包む。","萩谷の壁ドン。","夢の種が芽吹く時。","優しい時間が流れる日。",
-        "脳筋大爆発！","今この瞬間を味わおう。","感謝が未来を開く日。","浜田と焼肉食べ放題。","すべてが少しずつ良くなる。"
-      ];
+    <div class="preview" id="previewBox" aria-hidden="false">
+      <div><strong>プレビュー</strong></div>
+      <img id="previewImg" alt="preview" src="" style="display:none">
+      <div id="noPreview">画像が選択されていません</div>
+    </div>
+  </div>
 
-      function getMessage(kanji) {
-        const today = new Date().toISOString().split('T')[0];
-        const key = `fortune_${kanji}_${today}`;
-        const saved = localStorage.getItem(key);
+  <div style="margin-top:6px">
+    <label><input type="radio" name="mode" value="sandbox" checked> サンドボックスプレビュー（安全）</label>
+    <label style="margin-left:12px"><input type="radio" name="mode" value="ar"> AR実機モード（A-Frame + AR.js）</label>
+  </div>
 
-        if (saved) return saved;
+  <div class="buttons">
+    <button id="generateBtn" disabled>生成</button>
+    <button id="openBtn" disabled>新しいタブで開く</button>
+    <button id="downloadBtn" disabled>ダウンロード</button>
+    <button id="sampleBtn">サンプル画像でテスト</button>
+    <button id="hiroBtn">Hiro マーカーを開く（印刷用）</button>
+  </div>
 
-        let hash = 0;
-        const str = kanji + today;
-        for (let i = 0; i < str.length; i++) {
-          hash = (hash << 5) - hash + str.charCodeAt(i);
-          hash |= 0;
-        }
-        const index = Math.abs(hash) % messages.length;
-        const message = messages[index];
+  <div class="note">
+    <strong>注意:</strong> AR 実機モードは HTTPS とカメラ許可が必要です（GitHub Pages 推奨）。サンドボックスプレビューは AR ではなく、Hiro 風の SVG 上に画像を重ねた静的プレビューです。
+  </div>
 
-        localStorage.clear();
-        localStorage.setItem(key, message);
-        localStorage.setItem('fortune_date', today);
-        return message;
-      }
+  <div class="result" id="result"></div>
 
-      btn.addEventListener('click', () => {
-        const kanji = input.value.trim();
-        if (!kanji.match(/^[一-龯]$/)) {
-          result.textContent = '漢字1文字を入力してください。';
-          return;
-        }
-        const today = new Date().toISOString().split('T')[0];
-        const storedDate = localStorage.getItem('fortune_date');
-        if (storedDate && storedDate !== today) {
-          localStorage.clear();
-        }
-        const message = getMessage(kanji);
-        result.textContent = message;
-      });
-    });
-  </script>
+  <footer>
+    <div>使い方の要点: 画像を選択 → 「生成」→ ダウンロードしてスマホで開く → Hiro マーカーをかざす</div>
+  </footer>
+
+<script>
+/*
+  安全ポイント:
+  - 親スクリプトが途中で終了するのを避けるため、生成する HTML 内に直接リテラルで </script> を書かないようにしている箇所があります。
+  - 生成 HTML を Blob URL としてダウンロード／別タブで開く設計 (サンドボックスでは data: URL による iframe 表示を推奨)。
+*/
+
+const imageInput = document.getElementById('imageInput');
+const previewImg = document.getElementById('previewImg');
+const noPreview = document.getElementById('noPreview');
+const generateBtn = document.getElementById('generateBtn');
+const openBtn = document.getElementById('openBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const sampleBtn = document.getElementById('sampleBtn');
+const hiroBtn = document.getElementById('hiroBtn');
+const resultDiv = document.getElementById('result');
+
+let uploadedDataUrl = '';
+let lastBlobUrl = '';
+let lastHtmlString = '';
+let lastFilename = 'ar_marker_preview.html';
+
+function fileToDataUrl(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = () => rej(new Error('FileReader error'));
+    fr.readAsDataURL(file);
+  });
+}
+
+imageInput.addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  if(!f.type.startsWith('image/')) return alert('画像ファイルを選択してください');
+  try {
+    const d = await fileToDataUrl(f);
+    uploadedDataUrl = d;
+    previewImg.src = d;
+    previewImg.style.display = 'block';
+    noPreview.style.display = 'none';
+    generateBtn.disabled = false;
+  } catch(err) {
+    console.error(err);
+    alert('画像の読み込みに失敗しました');
+  }
+});
+
+sampleBtn.addEventListener('click', () => {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='100%' height='100%' fill='#fff'/><circle cx='256' cy='200' r='120' fill='#eee'/><text x='50%' y='85%' text-anchor='middle' font-size='36' fill='#333'>Sample</text></svg>`;
+  const data = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  uploadedDataUrl = data;
+  previewImg.src = data;
+  previewImg.style.display = 'block';
+  noPreview.style.display = 'none';
+  generateBtn.disabled = false;
+});
+
+// Hiro marker image (printable) - external link
+hiroBtn.addEventListener('click', () => {
+  window.open('https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/images/HIRO.jpg', '_blank');
+});
+
+function getMode(){
+  const r = document.querySelector('input[name="mode"]:checked');
+  return r ? r.value : 'sandbox';
+}
+
+// create safe script tag string (avoid literal </script> in parent source)
+function safeScriptTag(src){
+  return '<' + 'script src="' + src + '">' + '<' + '/scr' + 'ipt>';
+}
+
+// Build AR HTML for real device (contains A-Frame + AR.js)
+function buildArHtml(imageDataUrl){
+  // small CSS
+  const style = 'body{margin:0;font-family:system-ui} .hint{position:fixed;left:8px;top:8px;z-index:999;background:rgba(255,255,255,0.95);padding:8px;border-radius:6px}';
+  const head = '<!doctype html>\\n<html lang="ja">\\n<head>\\n<meta charset="utf-8">\\n<meta name="viewport" content="width=device-width,initial-scale=1">\\n<title>AR Preview</title>\\n<meta name="viewport" content="width=device-width,initial-scale=1">\\n<meta http-equiv="Content-Security-Policy" content="default-src \'self\' data: https:; script-src \'self\' https:; style-src \'self\' \'unsafe-inline\' https:; img-src \'self\' data: https:;">\\n<style>' + style + '</style>\\n';
+  const scripts = safeScriptTag('https://aframe.io/releases/1.4.2/aframe.min.js') + '\\n' + safeScriptTag('https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js');
+  const body = '</head>\\n<body>\\n<div class="hint">カメラを許可して Hiro マーカーをかざしてください（実機で確認してください）</div>\\n';
+  const scene = '<a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">\\n  <a-marker preset="hiro">\\n    <a-plane src="' + imageDataUrl + '" position="0 0 0" rotation="-90 0 0" width="1" height="0.75"></a-plane>\\n  </a-marker>\\n  <a-entity camera></a-entity>\\n</a-scene>\\n';
+  const end = '\\n</body>\\n</html>';
+  return head + scripts + body + scene + end;
+}
+
+// Build sandbox preview HTML (static SVG marker + overlay image)
+function buildSandboxHtml(imageDataUrl){
+  const svgMarker = '<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="100%" height="100%" fill="#fff"/><rect x="48" y="48" width="416" height="416" fill="#000"/><rect x="96" y="96" width="320" height="320" fill="#fff"/><rect x="128" y="128" width="256" height="256" fill="#000"/><text x="50%" y="96%" text-anchor="middle" fill="#333" font-size="18">Hiro-like Marker (preview)</text></svg>';
+  const style = 'body{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fafafa}.frame{position:relative;width:360px;height:360px;border:1px solid #ddd;background:#fff;padding:12px;box-shadow:0 6px 24px rgba(0,0,0,0.08)}.marker{width:100%;height:100%;display:block}.overlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60%;height:60%;object-fit:contain;border:2px solid rgba(255,255,255,0.7)}';
+  const html = '<!doctype html>\\n<html lang="ja">\\n<head>\\n<meta charset="utf-8">\\n<meta name="viewport" content="width=device-width,initial-scale=1">\\n<title>Sandbox Preview</title>\\n<style>' + style + '</style>\\n</head>\\n<body>\\n<div class="frame">\\n  <img class="marker" src="data:image/svg+xml;utf8,' + encodeURIComponent(svgMarker) + '" alt="marker">\\n  <img class="overlay" src="' + imageDataUrl + '" alt="uploaded">\\n</div>\\n</body>\\n</html>';
+  return html;
+}
+
+// convert string to base64 unicode-safe for data URL
+function toBase64Unicode(str){
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+function createBlobUrl(html){
+  const blob = new Blob([html], { type: 'text/html' });
+  return URL.createObjectURL(blob);
+}
+
+generateBtn.addEventListener('click', () => {
+  if(!uploadedDataUrl) return alert('先に画像を選択してください');
+  const mode = getMode();
+  if(mode === 'sandbox'){
+    const html = buildSandboxHtml(uploadedDataUrl);
+    lastHtmlString = html;
+    // use base64 data URL in iframe so parent script is not affected
+    const b64 = toBase64Unicode(html);
+    const dataUrl = 'data:text/html;base64,' + b64;
+    // remove previous iframe if any
+    const prev = document.querySelector('iframe.previewFrame');
+    if(prev) prev.remove();
+    const iframe = document.createElement('iframe');
+    iframe.className = 'previewFrame';
+    iframe.src = dataUrl;
+    iframe.sandbox = 'allow-same-origin allow-scripts allow-forms';
+    resultDiv.appendChild(iframe);
+    // also provide download/open links via Blob (download recommended)
+    try {
+      const blobUrl = createBlobUrl(html);
+      lastBlobUrl = blobUrl;
+      downloadBtn.disabled = false;
+      openBtn.disabled = false;
+      resultDiv.insertAdjacentHTML('beforeend', `<div style="margin-top:8px"><a class="link" href="${blobUrl}" target="_blank" rel="noopener noreferrer">生成したHTMLを新しいタブで開く（Blob）</a></div>`);
+    } catch(e) {
+      // fallback: create data URL link (may be large and truncated by some browsers)
+      resultDiv.insertAdjacentHTML('beforeend', `<div style="margin-top:8px;color:#b33">注意: ダウンロード用の Blob を作成できませんでした。代わりに iframe で表示しています。</div>`);
+      downloadBtn.disabled = true;
+      openBtn.disabled = true;
+    }
+  } else {
+    // AR実機モード: produce HTML that loads A-Frame and AR.js
+    const html = buildArHtml(uploadedDataUrl);
+    lastHtmlString = html;
+    try {
+      const blobUrl = createBlobUrl(html);
+      lastBlobUrl = blobUrl;
+      downloadBtn.disabled = false;
+      openBtn.disabled = false;
+      // show link
+      resultDiv.innerHTML = `<div class="ok">生成完了（AR実機モード） — ダウンロードして実機で開いてください</div><div style="margin-top:8px"><a class="link" href="${blobUrl}" target="_blank" rel="noopener noreferrer">生成したHTMLを新しいタブで開く（Blob）</a></div>`;
+    } catch(e){
+      console.error(e);
+      alert('生成に失敗しました（Blob 生成エラー）。ブラウザ環境を確認してください。');
+    }
+  }
+});
+
+openBtn.addEventListener('click', () => {
+  if(!lastBlobUrl && lastHtmlString){
+    try {
+      const tmp = createBlobUrl(lastHtmlString);
+      window.open(tmp, '_blank');
+    } catch(e) {
+      alert('新しいタブで開くことができません: ' + e.message);
+    }
+  } else if(lastBlobUrl) {
+    window.open(lastBlobUrl, '_blank');
+  } else {
+    alert('先に生成してください');
+  }
+});
+
+downloadBtn.addEventListener('click', () => {
+  if(!lastBlobUrl && lastHtmlString){
+    try {
+      const tmp = createBlobUrl(lastHtmlString);
+      const a = document.createElement('a');
+      a.href = tmp;
+      a.download = lastFilename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch(e) {
+      alert('ダウンロードに失敗しました: ' + e.message);
+    }
+  } else if(lastBlobUrl){
+    const a = document.createElement('a');
+    a.href = lastBlobUrl;
+    a.download = lastFilename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } else {
+    alert('先に生成してください');
+  }
+});
+
+// cleanup blob URLs on unload
+window.addEventListener('unload', () => {
+  try{ if(lastBlobUrl) URL.revokeObjectURL(lastBlobUrl); }catch(e){}
+});
+</script>
 </body>
 </html>
+
