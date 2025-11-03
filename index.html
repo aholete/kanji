@@ -4,28 +4,43 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ARマーカー作成アプリ</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.js"></script>
   <style>
     body {
       font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
-      background: #f5f5f5;
+      background: #f0f2f5;
       margin: 0;
-      padding: 2em;
+      padding: 20px;
       text-align: center;
+    }
+    h1 {
       color: #333;
     }
-    h1 { margin-bottom: 1em; }
+    #container {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    input, button {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
     input[type="file"] {
-      margin: 1em 0;
+      background: #eaeaea;
     }
     button {
-      margin: 0.5em;
-      padding: 0.6em 1.2em;
-      border: none;
-      border-radius: 6px;
+      cursor: pointer;
       background: #007bff;
       color: white;
-      font-size: 1em;
-      cursor: pointer;
+      transition: 0.3s;
     }
     button:hover {
       background: #0056b3;
@@ -33,44 +48,48 @@
   </style>
 </head>
 <body>
-  <h1>ARマーカー作成アプリ</h1>
-  <p>画像をアップロードすると、その画像を表示するARマーカーHTMLを生成します。</p>
+  <div id="container">
+    <h1>ARマーカー作成アプリ</h1>
+    <p>画像をアップロードすると、その画像をARで表示できるマーカーを生成します。</p>
 
-  <input type="file" id="imageInput" accept="image/*"><br>
-  <button id="generateBtn">生成</button>
-  <button id="sampleBtn">サンプル画像でテスト</button>
+    <input type="file" id="imageInput" accept="image/*">
+    <button id="generateBtn">ARマーカーを生成</button>
+    <button id="sampleBtn">サンプル画像でテスト</button>
+  </div>
 
   <script>
+    const imageInput = document.getElementById('imageInput');
     const generateBtn = document.getElementById('generateBtn');
     const sampleBtn = document.getElementById('sampleBtn');
-    const imageInput = document.getElementById('imageInput');
 
-    function openARWindow(imageSrc) {
+    // 画像をAR表示用HTMLに埋め込んで新しいウィンドウで開く関数
+    function openARWindow(imageURL) {
       const html = `
-        <!DOCTYPE html>
-        <html lang="ja">
-        <head>
-          <meta charset="UTF-8">
-          <title>AR表示</title>
-          <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-          <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
-          <style>body { margin: 0; overflow: hidden; }</style>
-        </head>
-        <body>
-          <a-scene embedded arjs="sourceType: webcam;">
-            <a-marker preset="hiro">
-              <a-image src="${imageSrc}" rotation="-90 0 0" width="1" height="1"></a-image>
-            </a-marker>
-            <a-entity camera></a-entity>
-          </a-scene>
-        </body>
-        </html>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>AR表示</title>
+        <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.2/aframe/build/aframe-ar.js"></script>
+        <style>body { margin: 0; overflow: hidden; }</style>
+      </head>
+      <body>
+        <a-scene embedded arjs>
+          <a-marker preset="hiro">
+            <a-image src="${imageURL}" width="2" height="2"></a-image>
+          </a-marker>
+          <a-entity camera></a-entity>
+        </a-scene>
+      </body>
+      </html>
       `;
       const blob = new Blob([html], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
     }
 
+    // 画像をアップロードしてARマーカー生成
     generateBtn.addEventListener('click', () => {
       const file = imageInput.files[0];
       if (!file) {
@@ -82,6 +101,7 @@
       reader.readAsDataURL(file);
     });
 
+    // サンプル画像でテスト
     sampleBtn.addEventListener('click', () => {
       const sampleURL = "https://raw.githubusercontent.com/AR-js-org/AR.js/master/three.js/data/images/HIRO.jpg";
       openARWindow(sampleURL);
