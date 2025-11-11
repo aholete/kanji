@@ -1,28 +1,153 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ARマーカー表示テスト</title>
-  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.3.2/aframe/build/aframe-ar.js"></script>
-  <style>
-    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
-    a-scene { width: 100%; height: 100%; }
-  </style>
+    <title>リアルタイム画像共有アプリ</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f9; }
+        h1 { color: #333; }
+        h2 { color: #555; border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 30px; }
+        #image-upload { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        #file-input { margin-right: 10px; }
+        button { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        #upload-status { margin-top: 10px; font-weight: bold; }
+        #image-gallery { display: flex; flex-wrap: wrap; gap: 15px; padding-top: 10px; }
+        .image-item { border: 1px solid #ccc; padding: 5px; border-radius: 5px; background-color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .image-item img { max-width: 150px; max-height: 150px; display: block; border-radius: 3px; object-fit: cover; }
+    </style>
 </head>
 <body>
-  <a-scene
-    embedded
-    vr-mode-ui="enabled: false"
-    arjs="sourceType: webcam; debugUIEnabled: false;"
-  >
-    <!-- ✅ デフォルトの「hiro」マーカーを使用 -->
-    <a-marker preset="hiro">
-      <a-box position="0 0.5 0" material="color: red;"></a-box>
-    </a-marker>
 
-    <a-entity camera></a-entity>
-  </a-scene>
+    <h1>📸 リアルタイム画像共有</h1>
+
+    <div id="image-upload">
+        <input type="file" id="file-input" accept="image/*">
+        <button onclick="uploadImage()">アップロード</button>
+        <p id="upload-status" style="color: blue;">ファイルを選択してアップロードボタンを押してください。</p>
+    </div>
+
+    <hr>
+
+    <h2>🖼️ ギャラリー</h2>
+    <div id="image-gallery">
+        </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+
+    <script>
+        // *** 💡 StorageBucketを修正しました ***
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvDUbgyy0mjItS9EROQEsWVOj1LdOkkxQ",
+            authDomain: "image-aa366.firebaseapp.com",
+            projectId: "image-aa366",
+            // 💡 修正後のバケット名（通常はprojectId.appspot.com）
+            storageBucket: "image-aa366.appspot.com", 
+            messagingSenderId: "7811593965",
+            appId: "1:7811593965:web:58e5fb686c765f4e497ee4"
+        };
+
+        // Firebaseの初期化
+        firebase.initializeApp(firebaseConfig);
+
+        const storage = firebase.storage();
+        const database = firebase.database();
+        const galleryRef = database.ref('images');
+        const fileInput = document.getElementById('file-input');
+        const uploadStatus = document.getElementById('upload-status');
+        const imageGallery = document.getElementById('image-gallery');
+
+        /**
+         * 選択された画像をFirebase Storageにアップロードし、
+         * そのURLをRealtime Databaseに保存する
+         */
+        function uploadImage() {
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('画像ファイルを選択してください。');
+                return;
+            }
+
+            uploadStatus.textContent = 'アップロード中...';
+
+            // Storageに保存するためのユニークなファイル名を作成
+            const fileName = `${new Date().getTime()}_${file.name}`;
+            const storageRef = storage.ref(`gallery_images/${fileName}`);
+
+            // ファイルのアップロード
+            const uploadTask = storageRef.put(file);
+
+            // アップロードの状態を監視
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    // 進捗表示
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    uploadStatus.textContent = `アップロード中: ${progress.toFixed(2)}%`;
+                },
+                (error) => {
+                    // エラー処理
+                    console.error("アップロードエラー:", error);
+                    // エラーコードとメッセージをユーザーに通知
+                    uploadStatus.textContent = `アップロード失敗 (${error.code}): ${error.message}`; 
+                    alert(`画像のアップロードに失敗しました。\nエラーコード: ${error.code}`);
+                },
+                () => {
+                    // アップロード完了後の処理
+                    uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+                        console.log('アップロード完了。ダウンロードURL:', downloadURL);
+                        uploadStatus.textContent = '✅ アップロード完了！';
+
+                        // Realtime Databaseに画像のURLとタイムスタンプを保存
+                        galleryRef.push({
+                            url: downloadURL,
+                            timestamp: firebase.database.ServerValue.TIMESTAMP
+                        }).catch(err => {
+                            console.error("DBへの書き込みエラー:", err);
+                            uploadStatus.textContent += ` (DBエラー: ${err.message})`;
+                        });
+
+                        // フォームをリセット
+                        fileInput.value = '';
+                    });
+                }
+            );
+        }
+
+        /**
+         * Realtime Databaseの変更をリッスンし、
+         * 画像が追加されたときにギャラリーを更新する
+         */
+        // データを新しい順に取得するため、ここでは順序付けを行いません。
+        // 代わりに、child_addedイベントでDOMの先頭に挿入します。
+        galleryRef.on('child_added', (snapshot) => {
+            const imageItem = snapshot.val();
+            const key = snapshot.key;
+
+            // 既にDOMに存在する場合は何もしない (重複表示防止)
+            if (document.getElementById(`image-${key}`)) {
+                return;
+            }
+
+            // ギャラリーに追加するDOM要素を作成
+            const div = document.createElement('div');
+            div.className = 'image-item';
+            div.id = `image-${key}`;
+
+            const img = document.createElement('img');
+            img.src = imageItem.url;
+            img.alt = '共有画像';
+            img.title = new Date(imageItem.timestamp).toLocaleString(); // ツールチップに時間を表示
+
+            div.appendChild(img);
+            
+            // 常に最新の画像を先頭に追加 (最新アップロードの画像が一番上に来る)
+            imageGallery.insertBefore(div, imageGallery.firstChild);
+        });
+    </script>
+
 </body>
 </html>
